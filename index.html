@@ -21,7 +21,7 @@
     </div>
     
     <div id="instructions">
-        <b>Tablet/Telefon:</b> Sürükleyerek yön ver.<br>
+        <b>Tablet/Telefon:</b> Parmağını sürükleyerek yön ver (İleri, Geri, Sağ, Sol).<br>
         Özel güç butonlarına basarak uç!
     </div>
 
@@ -29,7 +29,7 @@
         <h1>OsBalls Parkour</h1>
         <p>Her Turda Ücretsiz Özel Güçler ve Özelleştirilebilir Toplar ile Macera Başlıyor!</p>
         <div class="menu-buttons">
-            <button class="btn" id="start-btn">Oyna</button>
+            <button class="btn" id="start-btn" style="font-size: 24px; padding: 15px 40px; animation: pulse 1.5s infinite;">OYUNU BAŞLAT 🎮</button>
         </div>
     </div>
 
@@ -102,7 +102,6 @@
             powers: { jump: 1, speed: 1, bridge: 1 }
         };
 
-        // Her tur başında güçleri en az 1 yapacak fonksiyon
         function grantFreePowers() {
             if (!userData.powers) {
                 userData.powers = { jump: 1, speed: 1, bridge: 1 };
@@ -193,7 +192,7 @@
         let coins = [];
         let obstacles = [];
         let temporaryBridges = [];
-        let isPlaying = false;
+        let isPlaying = false; // "Oyna" butonuna basılana kadar oyun başlamaz
 
         const textureLoader = new THREE.TextureLoader();
         const startScreen = document.getElementById('start-screen');
@@ -203,7 +202,7 @@
         function init() {
             scene = new THREE.Scene();
 
-            // GÜNCELLEME: Senin yüklediğin "sky.JPG" dosyası arka plan yapıldı
+            // Arka Plan (sky.JPG)
             textureLoader.load('assets/sky.JPG', function(texture) {
                 scene.background = texture;
             }, undefined, function() {
@@ -231,7 +230,7 @@
             dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
-            // Fizik
+            // Fizik Dünyası
             world = new CANNON.World();
             world.gravity.set(0, -22, 0);
 
@@ -249,7 +248,7 @@
             loadGame();
             applyBallSkin(userData.equippedSkin);
 
-            // Kontroller
+            // Kontroller (Klavye)
             window.addEventListener('keydown', (e) => {
                 handleKeys(e, true);
                 if (e.key === '1') usePower('jump');
@@ -259,24 +258,44 @@
             window.addEventListener('keyup', (e) => handleKeys(e, false));
             window.addEventListener('resize', onWindowResize);
 
-            // Mobil Sürükleme
+            // Mobil Sürükleme (Joystick benzeri 360 Derece Sürükleme Kontrolü)
             let touchStartX = 0;
-            window.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+            let touchStartY = 0;
+
+            window.addEventListener('touchstart', (e) => { 
+                touchStartX = e.touches[0].clientX; 
+                touchStartY = e.touches[0].clientY; 
+            });
+
             window.addEventListener('touchmove', (e) => {
                 if(!isPlaying) return;
                 const touchX = e.touches[0].clientX;
+                const touchY = e.touches[0].clientY;
+                
                 const diffX = touchX - touchStartX;
-                ballBody.velocity.x = diffX * 0.18;
+                const diffY = touchY - touchStartY;
+
+                // X Ekseni (Sağ - Sol)
+                ballBody.velocity.x = diffX * 0.15;
+                // Y Ekseni (İleri - Geri) - Ekranda yukarı kaydırmak ileri (-z yönü) gitmesini sağlar
+                ballBody.velocity.z = diffY * 0.15;
+
                 touchStartX = touchX;
+                touchStartY = touchY;
             });
+
             window.addEventListener('touchend', () => {
-                if(isPlaying) ballBody.velocity.x *= 0.5;
+                if(isPlaying) {
+                    ballBody.velocity.x *= 0.5;
+                    ballBody.velocity.z *= 0.5;
+                }
             });
 
             document.getElementById('pbtn-jump').addEventListener('click', () => usePower('jump'));
             document.getElementById('pbtn-speed').addEventListener('click', () => usePower('speed'));
             document.getElementById('pbtn-bridge').addEventListener('click', () => usePower('bridge'));
 
+            // Buton Dinleyicileri
             document.getElementById('start-btn').addEventListener('click', startGame);
             document.getElementById('restart-btn').addEventListener('click', restartGame);
             document.getElementById('next-btn').addEventListener('click', restartGame);
@@ -301,7 +320,6 @@
                 ballMesh.material.metalness = 0.2;
                 ballMesh.material.roughness = 0.8;
             } else {
-                // GÜNCELLEME: Senin yüklediğin "OsBall.png" dosyası klasik top kaplaması yapıldı
                 textureLoader.load('assets/OsBall.png', function(texture) {
                     ballMesh.material.map = texture;
                     ballMesh.material.color.setHex(0xffffff);
@@ -337,10 +355,9 @@
             scene.add(ballMesh);
         }
 
-        // --- HARİTA VE YOL TASARIMI ---
+        // --- HARİTA TASARIMI ---
         function buildTrack() {
             const roadMaterial = new THREE.MeshStandardMaterial({ roughness: 0.6 });
-            // GÜNCELLEME: Senin yüklediğin "wood_platform.jpg" kullanılıyor
             textureLoader.load('assets/wood_platform.jpg', function(texture) {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
@@ -404,7 +421,6 @@
         function createCoin(x, y, z) {
             const geometry = new THREE.CylinderGeometry(0.8, 0.8, 0.15, 16);
             const coinMat = new THREE.MeshStandardMaterial({ metalness: 0.9, roughness: 0.1 });
-            // GÜNCELLEME: Senin yüklediğin "Coin.png" dosyası coin kaplaması yapıldı
             textureLoader.load('assets/Coin.png', function(texture) {
                 coinMat.map = texture;
                 coinMat.needsUpdate = true;
@@ -486,7 +502,7 @@
             }
         }
 
-        // --- SİSTEM ---
+        // --- TUŞ ATAMALARI ---
         function handleKeys(e, isPressed) {
             const key = e.key.toLowerCase();
             if (['w', 'arrowup'].includes(key)) keys.w = isPressed;
@@ -501,10 +517,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Oyunu Başlat
+        // --- BAŞLAT BUTONU TETİKLEYİCİSİ ---
         function startGame() {
             startScreen.classList.remove('active');
-            isPlaying = true;
+            isPlaying = true; // Fizik ve hareketler şimdi aktif!
         }
 
         function gameOver() {
@@ -557,6 +573,7 @@
                 world.step(1 / 60);
 
                 const force = 38;
+                // ARTIK W VE S TUŞLARI AKTİF: İLERİ VE GERİ GİTME FİZİĞİ
                 if (keys.w) ballBody.applyForce(new CANNON.Vec3(0, 0, -force), ballBody.position);
                 if (keys.s) ballBody.applyForce(new CANNON.Vec3(0, 0, force), ballBody.position);
                 if (keys.a) ballBody.applyForce(new CANNON.Vec3(-force, 0, 0), ballBody.position);
