@@ -155,7 +155,7 @@
         /* OYUN İÇİ ÖZEL GÜÇ PANELİ (HUD) */
         #powers-hud {
             position: absolute;
-            bottom: 120px;
+            bottom: 30px; /* Alttaki yazı kalktığı için artık daha aşağıda ve şık duruyor */
             left: 20px;
             display: flex;
             flex-direction: column;
@@ -196,32 +196,8 @@
         }
         .power-btn span b { color: #fff; }
 
-        /* YÖNERGE YAZISI */
-        #instructions {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            max-width: 500px;
-            background: rgba(10, 15, 30, 0.85);
-            color: #fff;
-            padding: 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            line-height: 1.4;
-            text-align: center;
-            border: 1px solid #334155;
-            z-index: 20;
-            transition: opacity 0.3s, visibility 0.3s;
-            /* OYUN BAŞLAMADAN ÖNCE GİZLİ OLACAK */
-            opacity: 0;
-            visibility: hidden;
-        }
-
         /* OYUN BAŞLADIĞINDA DEVREYE GİRECEK SINIFLAR */
-        body.playing #powers-hud,
-        body.playing #instructions {
+        body.playing #powers-hud {
             opacity: 1;
             visibility: visible;
         }
@@ -319,25 +295,20 @@
     <div id="level-indicator">BÖLÜM: <span id="current-level-val">1</span></div>
 
     <div id="powers-hud">
-        <button class="power-btn" id="pbtn-jump">🚀 1. Zıplama <span>[Sayı: <b id="p1-qty">1</b>]</span></button>
-        <button class="power-btn" id="pbtn-speed">⚡ 2. 2x Hız <span>[Sayı: <b id="p2-qty">1</b>]</span></button>
-        <button class="power-btn" id="pbtn-bridge">🌉 3. Yol Koy <span>[Sayı: <b id="p3-qty">1</b>]</span></button>
-    </div>
-    
-    <div id="instructions">
-        <b>Tablet/Telefon:</b> Topu fırlatmak için parmağını ekranda aşağıdan yukarıya doğru hızla kaydırıp bırak!<br>
-        Özel güç butonlarına basarak uç!
+        <button class="power-btn" id="pbtn-jump">🚀 1. Zıplama <span>[Sayı: <b id="p1-qty">10</b>]</span></button>
+        <button class="power-btn" id="pbtn-speed">⚡ 2. 2x Hız <span>[Sayı: <b id="p2-qty">10</b>]</span></button>
+        <button class="power-btn" id="pbtn-bridge">🌉 3. Yol Koy <span>[Sayı: <b id="p3-qty">10</b>]</span></button>
     </div>
 
     <div id="start-screen" class="screen active">
         <h1>OSBALLS PARKOUR</h1>
-        <p>Her Turda Ücretsiz Özel Güçler ve Özelleştirilebilir Toplar ile Macera Başlıyor!</p>
+        <p>Her Turda Ücretsiz 10 Özel Güç ve Özelleştirilebilir Toplar ile Macera Başlıyor!</p>
         <button class="btn" id="start-btn" style="font-size: 24px; padding: 15px 40px; animation: pulse 1.5s infinite;">OYUNU BAŞLAT 🎮</button>
     </div>
 
     <div id="gameover-screen" class="screen">
         <h1 style="color: #ff3d00;">Düştün!</h1>
-        <p style="color: #ff9800; font-weight: bold; margin-bottom: 15px;">Üzülme, yeni turda tüm özel güçlerin yenilendi! 🎁</p>
+        <p style="color: #ff9800; font-weight: bold; margin-bottom: 15px;">Üzülme, yeni turda tüm özel güçlerin 10 adet olarak yenilendi! 🎁</p>
         <button class="btn secondary" id="restart-btn">Tekrar Dene</button>
     </div>
 
@@ -370,18 +341,18 @@
         </div>
 
         <div class="shop-section">
-            <h3>Özel Güçler (100 Altın)</h3>
+            <h3>Özel Güç Al (100 Altın)</h3>
             <div class="shop-items">
                 <div class="shop-card" id="buy-p1">
-                    <h4>Zıplama</h4>
+                    <h4>Zıplama (+1)</h4>
                     <span class="price">100 Altın</span>
                 </div>
                 <div class="shop-card" id="buy-p2">
-                    <h4>2x Hız</h4>
+                    <h4>2x Hız (+1)</h4>
                     <span class="price">100 Altın</span>
                 </div>
                 <div class="shop-card" id="buy-p3">
-                    <h4>Yol Koyma</h4>
+                    <h4>Yol Koyma (+1)</h4>
                     <span class="price">100 Altın</span>
                 </div>
             </div>
@@ -402,28 +373,46 @@
             level: 1,
             ownedSkins: ['default'],
             equippedSkin: 'default',
-            powers: { jump: 1, speed: 1, bridge: 1 }
+            powers: { jump: 10, speed: 10, bridge: 10 }
         };
 
+        // Her turda veya başlangıçta güçleri 10'a tamamlama fonksiyonu
         function grantFreePowers() {
             if (!userData.powers) {
-                userData.powers = { jump: 1, speed: 1, bridge: 1 };
+                userData.powers = { jump: 10, speed: 10, bridge: 10 };
             }
-            if (userData.powers.jump < 1) userData.powers.jump = 1;
-            if (userData.powers.speed < 1) userData.powers.speed = 1;
-            if (userData.powers.bridge < 1) userData.powers.bridge = 1;
+            if (userData.powers.jump < 10) userData.powers.jump = 10;
+            if (userData.powers.speed < 10) userData.powers.speed = 10;
+            if (userData.powers.bridge < 10) userData.powers.bridge = 10;
             saveGame();
         }
 
         function loadGame() {
             const savedData = localStorage.getItem('osball_save');
             if (savedData) {
-                userData = JSON.parse(savedData);
+                try {
+                    const parsed = JSON.parse(savedData);
+                    // Kaydedilen seviye bozuk veya tanımsızsa 1 yap
+                    if (parsed && typeof parsed === 'object') {
+                        userData = parsed;
+                        if (!userData.level || isNaN(userData.level)) {
+                            userData.level = 1;
+                        }
+                    }
+                } catch(e) {
+                    userData.level = 1;
+                }
+            } else {
+                userData.level = 1;
             }
             grantFreePowers();
         }
 
         function saveGame() {
+            // Seviyenin asla bozulmaması için kontrol ekliyoruz
+            if (!userData.level || isNaN(userData.level)) {
+                userData.level = 1;
+            }
             localStorage.setItem('osball_save', JSON.stringify(userData));
             updateUI();
         }
@@ -645,7 +634,8 @@
                 shape: sphereShape,
                 material: material
             });
-            ballBody.position.set(0, 5, 0); // Başlangıç havada pozisyonu
+            // BOŞLUKTA BAŞLAMAMA DÜZELTMESİ: y koordinatını 1.2 yaparak doğrudan ilk platformun üstüne oturtuyoruz!
+            ballBody.position.set(0, 1.2, 0); 
             ballBody.linearDamping = 0.15;
             ballBody.angularDamping = 0.15;
             world.addBody(ballBody);
@@ -662,7 +652,7 @@
         function clearTrack() {
             platforms.forEach(p => {
                 scene.remove(p.mesh);
-                world.remove(p.body);
+                if(p.body) world.remove(p.body);
             });
             platforms = [];
 
@@ -704,7 +694,7 @@
             let currentZ = -platformLength / 2;
             let currentY = 0;
 
-            // 1. Platform (Güvenli Bölge)
+            // 1. Platform (Güvenli Bölge) - Zemin sıfır seviyesinde duruyor
             createPlatform(roadWidth, 1, platformLength, 0, currentY, currentZ, roadMaterial);
             
             // Altınlar
@@ -808,7 +798,7 @@
             const mesh = new THREE.Mesh(geometry, material);
             mesh.position.set(x, y, z);
             scene.add(mesh);
-            platforms.push({ body: new CANNON.Body({ mass: 0 }), mesh });
+            platforms.push({ body: null, mesh });
         }
 
         // --- ÖZEL GÜÇ KULLANIMI ---
@@ -914,8 +904,8 @@
         function restartGame(isNextLevel = false) {
             grantFreePowers();
 
-            // Topu başlangıç noktasına sıfırla
-            ballBody.position.set(0, 5, 0);
+            // Topu doğrudan zemin hizasında pürüzsüzce sıfırla (Havada asılı kalmayacak)
+            ballBody.position.set(0, 1.2, 0);
             ballBody.velocity.set(0,0,0);
             ballBody.angularVelocity.set(0,0,0);
             speedBoostActive = false;
@@ -959,7 +949,7 @@
                     let b = temporaryBridges[i];
                     if (Date.now() > b.expiry) {
                         scene.remove(b.mesh);
-                        world.remove(b.body);
+                        if(b.body) world.remove(b.body);
                         temporaryBridges.splice(i, 1);
                     }
                 }
