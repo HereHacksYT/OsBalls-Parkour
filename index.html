@@ -5,18 +5,307 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>OsBalls Parkour</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
     <style>
-        /* Başlangıçta oyun arayüzlerini gizlemek için sınıflar */
-        #top-bar, #powers-hud, #instructions, #canvas-container {
-            display: none;
+        /* GENEL TASARIM */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        /* Oyun başladığında görünür yapmak için */
-        .game-active #top-bar, 
-        .game-active #powers-hud, 
-        .game-active #instructions, 
-        .game-active #canvas-container {
-            display: block !important;
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050711;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1; /* 3D Sahne en arkada */
+            display: block; /* Her zaman görünür, arkada render edilecek */
+        }
+
+        /* EKRANLAR (Giriş, Gameover, Win) */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+            opacity: 0;
+            visibility: hidden;
+        }
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* GİRİŞ EKRANI ÖZEL: Arkadaki 3D sahne hafifçe süzülsün diye yarı şeffaf karanlık yapıyoruz */
+        #start-screen {
+            background: rgba(5, 7, 17, 0.75); /* Arkadaki top ve yollar arkadan çok tatlı görünecek */
+        }
+        #gameover-screen { background: rgba(20, 5, 5, 0.9); }
+        #win-screen { background: rgba(5, 20, 15, 0.9); }
+
+        /* BAŞLIKLAR VE METİNLER */
+        h1 {
+            font-size: 42px;
+            font-weight: 900;
+            color: #ff9100;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 145, 0, 0.6);
+        }
+        p {
+            color: #ccc;
+            font-size: 16px;
+            max-width: 500px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        /* BUTONLAR */
+        .btn {
+            background: linear-gradient(135deg, #00ffcc, #0099ff);
+            border: none;
+            color: #050711;
+            padding: 14px 35px;
+            font-size: 18px;
+            font-weight: 900;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 25px rgba(0, 255, 204, 0.4);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 30px rgba(0, 255, 204, 0.6);
+        }
+        .btn.secondary {
+            background: linear-gradient(135deg, #ff9100, #ff3d00);
+            box-shadow: 0 5px 25px rgba(255, 61, 0, 0.4);
+        }
+        .btn.secondary:hover {
+            box-shadow: 0 8px 30px rgba(255, 61, 0, 0.6);
+        }
+
+        /* ÜST BAR (ALTIN & MARKET) */
+        #top-bar {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 20; /* En üstte */
+        }
+        .ui-panel {
+            background: rgba(10, 15, 30, 0.85);
+            padding: 12px 25px;
+            border-radius: 12px;
+            border: 2px solid #334155;
+            color: #00ffcc;
+            font-weight: 900;
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+        }
+        #shop-trigger-btn:hover {
+            border-color: #00ffcc;
+            transform: scale(1.05);
+            color: #fff;
+        }
+
+        /* SEVİYE GÖSTERGESİ */
+        #level-indicator {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 15, 30, 0.85);
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 2px solid #00ffcc;
+            color: #fff;
+            font-weight: 900;
+            font-size: 16px;
+            z-index: 20;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 255, 204, 0.3);
+        }
+
+        /* OYUN İÇİ ÖZEL GÜÇ PANELİ (HUD) */
+        #powers-hud {
+            position: absolute;
+            bottom: 120px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 20;
+            transition: opacity 0.3s, visibility 0.3s;
+            /* OYUN BAŞLAMADAN ÖNCE GİZLİ OLACAK */
+            opacity: 0;
+            visibility: hidden;
+        }
+        .power-btn {
+            background: rgba(10, 15, 30, 0.85);
+            border: 2px solid #ff9100;
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 250px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            transition: all 0.2s;
+        }
+        .power-btn:hover {
+            transform: translateX(5px);
+            border-color: #00ffcc;
+        }
+        .power-btn span {
+            color: #ff9100;
+            font-size: 12px;
+            background: rgba(0,0,0,0.3);
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+        .power-btn span b { color: #fff; }
+
+        /* YÖNERGE YAZISI */
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 500px;
+            background: rgba(10, 15, 30, 0.85);
+            color: #fff;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            line-height: 1.4;
+            text-align: center;
+            border: 1px solid #334155;
+            z-index: 20;
+            transition: opacity 0.3s, visibility 0.3s;
+            /* OYUN BAŞLAMADAN ÖNCE GİZLİ OLACAK */
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        /* OYUN BAŞLADIĞINDA DEVREYE GİRECEK SINIFLAR */
+        body.playing #powers-hud,
+        body.playing #instructions {
+            opacity: 1;
+            visibility: visible;
+        }
+        body.playing #shop-trigger-btn {
+            display: none !important; /* Başlayınca market butonu gidecek! */
+        }
+
+        /* MARKET PENCERESİ */
+        #shop-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            width: 90%;
+            max-width: 450px;
+            background: rgba(10, 15, 30, 0.98);
+            border: 3px solid #00ffcc;
+            border-radius: 20px;
+            padding: 25px;
+            z-index: 100;
+            color: #fff;
+            box-shadow: 0 10px 40px rgba(0, 255, 204, 0.4);
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+        }
+        #shop-modal.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        .shop-section {
+            margin-bottom: 20px;
+        }
+        .shop-section h3 {
+            color: #ff9100;
+            font-size: 16px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 5px;
+        }
+        .shop-items {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        .shop-card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid #334155;
+            border-radius: 10px;
+            padding: 10px;
+            min-width: 110px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .shop-card:hover {
+            border-color: #00ffcc;
+            background: rgba(0, 255, 204, 0.05);
+        }
+        .shop-card.equipped {
+            border-color: #ff9100;
+            background: rgba(255, 145, 0, 0.1);
+        }
+        .shop-card h4 { font-size: 13px; margin-bottom: 5px; }
+        .shop-card .price { font-size: 11px; color: #00ffcc; font-weight: bold; }
+
+        .close-shop {
+            background: #ff3d00;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-weight: 900;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
@@ -27,10 +316,12 @@
         <div class="ui-panel" id="shop-trigger-btn" style="cursor: pointer;">🛒 MARKET</div>
     </div>
 
+    <div id="level-indicator">BÖLÜM: <span id="current-level-val">1</span></div>
+
     <div id="powers-hud">
-        <button class="power-btn" id="pbtn-jump">🚀 1. Zıplama <span>[Sayı: <b id="p1-qty">0</b>]</span></button>
-        <button class="power-btn" id="pbtn-speed">⚡ 2. 2x Hız <span>[Sayı: <b id="p2-qty">0</b>]</span></button>
-        <button class="power-btn" id="pbtn-bridge">🌉 3. Yol Koy <span>[Sayı: <b id="p3-qty">0</b>]</span></button>
+        <button class="power-btn" id="pbtn-jump">🚀 1. Zıplama <span>[Sayı: <b id="p1-qty">1</b>]</span></button>
+        <button class="power-btn" id="pbtn-speed">⚡ 2. 2x Hız <span>[Sayı: <b id="p2-qty">1</b>]</span></button>
+        <button class="power-btn" id="pbtn-bridge">🌉 3. Yol Koy <span>[Sayı: <b id="p3-qty">1</b>]</span></button>
     </div>
     
     <div id="instructions">
@@ -39,28 +330,26 @@
     </div>
 
     <div id="start-screen" class="screen active">
-        <h1>OsBalls Parkour</h1>
+        <h1>OSBALLS PARKOUR</h1>
         <p>Her Turda Ücretsiz Özel Güçler ve Özelleştirilebilir Toplar ile Macera Başlıyor!</p>
-        <div class="menu-buttons">
-            <button class="btn" id="start-btn" style="font-size: 24px; padding: 15px 40px; animation: pulse 1.5s infinite;">OYUNU BAŞLAT 🎮</button>
-        </div>
+        <button class="btn" id="start-btn" style="font-size: 24px; padding: 15px 40px; animation: pulse 1.5s infinite;">OYUNU BAŞLAT 🎮</button>
     </div>
 
     <div id="gameover-screen" class="screen">
-        <h1 style="background: linear-gradient(45deg, #ff3d00, #ff9100); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Düştün!</h1>
-        <p style="color: #ff9800; font-weight: bold; margin-bottom: 15px;">Üzülme, yeni turda tüm özel güçlerin 1 adet olarak yenilendi! 🎁</p>
+        <h1 style="color: #ff3d00;">Düştün!</h1>
+        <p style="color: #ff9800; font-weight: bold; margin-bottom: 15px;">Üzülme, yeni turda tüm özel güçlerin yenilendi! 🎁</p>
         <button class="btn secondary" id="restart-btn">Tekrar Dene</button>
     </div>
 
     <div id="win-screen" class="screen">
-        <h1 style="background: linear-gradient(45deg, #00ff87, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Parkur Tamamlandı!</h1>
-        <p>Bitiş çizgisine başarıyla ulaştın!</p>
-        <button class="btn" id="next-btn">Tekrar Oyna</button>
+        <h1 style="color: #00ff87;">Bölüm Tamamlandı!</h1>
+        <p id="win-p">Harika iş! Bir sonraki zorlu bölüme geçmeye hazır mısın?</p>
+        <button class="btn" id="next-btn">Sonraki Bölüm ➡️</button>
     </div>
 
     <div id="shop-modal">
-        <h2 style="color: #00ffcc; margin-top:0; font-size: 22px;">OsBalls Market</h2>
-        <p style="color: #ffd700; font-weight: bold; margin: 5px 0 15px 0;">Mevcut Altın: <span id="shop-gold">0</span> 🪙</p>
+        <h2 style="color: #00ffcc; margin-top:0; font-size: 22px; text-align: center;">OsBalls Market</h2>
+        <p style="color: #ffd700; font-weight: bold; text-align: center; margin: 5px 0 15px 0;">Mevcut Altın: <span id="shop-gold">0</span> 🪙</p>
         
         <div class="shop-section">
             <h3>Top Görünümleri</h3>
@@ -107,9 +396,10 @@
     <script src="https://cdn.jsdelivr.net/npm/cannon@0.6.2/build/cannon.min.js"></script>
 
     <script>
-        // --- DATA / SAVE SYSTEM (localStorage) ---
+        // --- VERİ SİSTEMİ ---
         let userData = {
-            gold: 0,
+            gold: 170, // Başlangıç altını test için 170 yapalım
+            level: 1,
             ownedSkins: ['default'],
             equippedSkin: 'default',
             powers: { jump: 1, speed: 1, bridge: 1 }
@@ -144,6 +434,7 @@
             document.getElementById('p1-qty').innerText = userData.powers.jump;
             document.getElementById('p2-qty').innerText = userData.powers.speed;
             document.getElementById('p3-qty').innerText = userData.powers.bridge;
+            document.getElementById('current-level-val').innerText = userData.level;
 
             document.querySelectorAll('.shop-card').forEach(card => card.classList.remove('equipped'));
             const currentSkinCard = document.getElementById(`skin-${userData.equippedSkin}`);
@@ -154,13 +445,9 @@
         const shopModal = document.getElementById('shop-modal');
         document.getElementById('shop-trigger-btn').addEventListener('click', () => {
             shopModal.classList.add('active');
-            isPlaying = false;
         });
         document.getElementById('close-shop-btn').addEventListener('click', () => {
             shopModal.classList.remove('active');
-            if(!startScreen.classList.contains('active') && !gameoverScreen.classList.contains('active') && !winScreen.classList.contains('active')) {
-                isPlaying = true;
-            }
         });
 
         function buySkin(skinId, price) {
@@ -204,10 +491,12 @@
         let keys = { w: false, a: false, s: false, d: false };
         let coins = [];
         let obstacles = [];
+        let platforms = [];
         let temporaryBridges = [];
-        let isPlaying = false; 
+        let isPlaying = false; // Başta FALSE: Fizik ve kontroller kapalı, sahne arkada render ediliyor
         let speedBoostActive = false; 
         let speedBoostTimer = null;
+        let finishZ = -255; 
 
         const textureLoader = new THREE.TextureLoader();
         const startScreen = document.getElementById('start-screen');
@@ -227,6 +516,9 @@
             scene.fog = new THREE.FogExp2(0x050711, 0.012);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            // Başlangıç Kamera Açısı (Arkadaki topu ve yolu görebilmek için)
+            camera.position.set(0, 6, 13);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -241,8 +533,6 @@
             const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
             dirLight.position.set(30, 60, 30);
             dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 1024;
-            dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
             // Fizik Dünyası
@@ -257,10 +547,9 @@
             });
             world.addContactMaterial(contactMaterial);
 
-            buildTrack();
-            createPlayerBall(ballMaterial);
-
             loadGame();
+            buildDynamicTrack(); 
+            createPlayerBall(ballMaterial);
             applyBallSkin(userData.equippedSkin);
 
             // Kontroller (Klavye)
@@ -279,35 +568,28 @@
             let touchStartTime = 0;
 
             window.addEventListener('touchstart', (e) => { 
-                if (e.target.closest('#powers-hud') || e.target.closest('#top-bar') || e.target.closest('#shop-modal')) return;
-                
+                if (e.target.closest('#powers-hud') || e.target.closest('#top-bar') || e.target.closest('#shop-modal') || e.target.closest('#start-screen')) return;
                 touchStartX = e.touches[0].clientX; 
                 touchStartY = e.touches[0].clientY; 
                 touchStartTime = Date.now();
             });
 
             window.addEventListener('touchend', (e) => {
-                if(!isPlaying) return;
-                if (e.target.closest('#powers-hud') || e.target.closest('#top-bar') || e.target.closest('#shop-modal')) return;
+                if(!isPlaying) return; // Oynanmıyorsa kaydırma çalışmasın!
+                if (e.target.closest('#powers-hud') || e.target.closest('#top-bar') || e.target.closest('#shop-modal') || e.target.closest('#start-screen')) return;
 
                 const touchEndX = e.changedTouches[0].clientX;
                 const touchEndY = e.changedTouches[0].clientY;
                 const touchDuration = Date.now() - touchStartTime;
 
-                // Sürükleme mesafeleri
                 const diffX = touchEndX - touchStartX;
                 const diffY = touchEndY - touchStartY;
 
-                // Sürükleme süresi çok uzun değilse (hızlı bir kaydırma yapıldıysa fırlat)
                 if (touchDuration < 600) {
-                    // Kuvvet çarpanı (Hız gücü aktifse fırlatma 2.5 kat daha güçlü olacak!)
                     const swipeMultiplier = speedBoostActive ? 0.35 : 0.15;
-
-                    // Cannon.js gövdesine anlık itme kuvveti (impulse) uyguluyoruz
                     const forceX = diffX * swipeMultiplier;
-                    const forceZ = diffY * swipeMultiplier; // Yukarı kaydırma negatif y'dir, yani -z (ileri) yönünde fırlar
+                    const forceZ = diffY * swipeMultiplier; 
 
-                    // Topa yönlü anlık kuvvet uygulayarak fırlatıyoruz!
                     ballBody.applyImpulse(new CANNON.Vec3(forceX, 0, forceZ), ballBody.position);
                 }
             });
@@ -316,10 +598,10 @@
             document.getElementById('pbtn-speed').addEventListener('click', () => usePower('speed'));
             document.getElementById('pbtn-bridge').addEventListener('click', () => usePower('bridge'));
 
-            // Buton Dinleyicileri
+            // Akış Dinleyicileri
             document.getElementById('start-btn').addEventListener('click', startGame);
             document.getElementById('restart-btn').addEventListener('click', restartGame);
-            document.getElementById('next-btn').addEventListener('click', restartGame);
+            document.getElementById('next-btn').addEventListener('click', loadNextLevel);
 
             animate();
         }
@@ -363,7 +645,7 @@
                 shape: sphereShape,
                 material: material
             });
-            ballBody.position.set(0, 5, 0);
+            ballBody.position.set(0, 5, 0); // Başlangıç havada pozisyonu
             ballBody.linearDamping = 0.15;
             ballBody.angularDamping = 0.15;
             world.addBody(ballBody);
@@ -376,8 +658,38 @@
             scene.add(ballMesh);
         }
 
-        // --- HARİTA TASARIMI ---
-        function buildTrack() {
+        // --- HARİTA KURMA SİSTEMİ ---
+        function clearTrack() {
+            platforms.forEach(p => {
+                scene.remove(p.mesh);
+                world.remove(p.body);
+            });
+            platforms = [];
+
+            obstacles.forEach(o => {
+                scene.remove(o.mesh);
+                world.remove(o.body);
+            });
+            obstacles = [];
+
+            coins.forEach(c => scene.remove(c));
+            coins = [];
+
+            temporaryBridges.forEach(b => {
+                scene.remove(b.mesh);
+                world.remove(b.body);
+            });
+            temporaryBridges = [];
+        }
+
+        function buildDynamicTrack() {
+            clearTrack();
+
+            const level = userData.level;
+            const platformCount = 2 + level; 
+            const platformLength = 80 + (level * 10); 
+            const roadWidth = Math.max(5, 9 - level * 0.5); 
+
             const roadMaterial = new THREE.MeshStandardMaterial({ roughness: 0.6 });
             textureLoader.load('assets/wood_platform.jpg', function(texture) {
                 texture.wrapS = THREE.RepeatWrapping;
@@ -389,25 +701,43 @@
                 roadMaterial.color.setHex(0x3e2723);
             });
 
-            createPlatform(8, 1, 100, 0, 0, -40, roadMaterial);
-            createPlatform(8, 1, 60, 0, 2, -120, roadMaterial);
-            createPlatform(8, 1, 80, 0, -2, -220, roadMaterial); 
+            let currentZ = -platformLength / 2;
+            let currentY = 0;
 
-            // Engeller
-            createObstacle(3, 3, 3, -2, 2, -30);
-            createObstacle(3, 3, 3, 2, 2, -60);
-            createObstacle(4, 2, 4, 0, 3.5, -110);
-            createObstacle(3, 3, 3, -1, 2, -210);
-
+            // 1. Platform (Güvenli Bölge)
+            createPlatform(roadWidth, 1, platformLength, 0, currentY, currentZ, roadMaterial);
+            
             // Altınlar
-            createCoin(0, 2, -20);
-            createCoin(-2, 2, -50);
-            createCoin(2, 4.5, -110);
-            createCoin(0, 2, -150);
-            createCoin(0, 1, -230);
+            createCoin(0, 2, -30);
+            createCoin(1.5, 2, -60);
 
-            // Bitiş Hattı
-            createFinishLine(8, 1, 5, 0, -1.4, -255);
+            // Dinamik Platformlar
+            for (let i = 1; i < platformCount; i++) {
+                const gap = 15 + (level * 2); 
+                currentZ -= (platformLength + gap);
+                currentY += (Math.random() * 6 - 3); 
+
+                createPlatform(roadWidth, 1, platformLength, 0, currentY, currentZ, roadMaterial);
+
+                // Engeller
+                const obstacleCount = 2 + level;
+                for (let j = 0; j < obstacleCount; j++) {
+                    const obsZ = currentZ + (Math.random() * platformLength - platformLength / 2);
+                    const obsX = (Math.random() * roadWidth) - roadWidth / 2;
+                    createObstacle(2.5, 2.5, 2.5, obsX, currentY + 2, obsZ);
+                }
+
+                // Altınlar
+                const coinCount = 3;
+                for (let j = 0; j < coinCount; j++) {
+                    const coinZ = currentZ + (Math.random() * platformLength - platformLength / 2);
+                    createCoin((Math.random() * (roadWidth - 2)) - (roadWidth - 2) / 2, currentY + 2, coinZ);
+                }
+            }
+
+            // Bitiş Çizgisi
+            finishZ = currentZ - (platformLength / 2);
+            createFinishLine(roadWidth, 1, 6, 0, currentY - 0.4, finishZ);
         }
 
         function createPlatform(w, h, d, x, y, z, material) {
@@ -421,6 +751,7 @@
             mesh.position.set(x, y, z);
             mesh.receiveShadow = true;
             scene.add(mesh);
+            platforms.push({ body, mesh });
         }
 
         function createObstacle(w, h, d, x, y, z) {
@@ -477,6 +808,7 @@
             const mesh = new THREE.Mesh(geometry, material);
             mesh.position.set(x, y, z);
             scene.add(mesh);
+            platforms.push({ body: new CANNON.Body({ mass: 0 }), mesh });
         }
 
         // --- ÖZEL GÜÇ KULLANIMI ---
@@ -492,18 +824,16 @@
 
             if (powerId === 'jump') {
                 ballBody.velocity.y = 15;
-                // Zıplarken de hız gücü aktifse daha uzağa uçsun
                 ballBody.velocity.z -= speedBoostActive ? 28 : 15;
             } 
             else if (powerId === 'speed') {
-                // Hız gücü aktif olduğunda üst üste fırlatmalar ve limitler uçuşa geçiyor!
                 speedBoostActive = true;
-                ballBody.velocity.z -= 45; // Anlık çılgın bir fırlatma
+                ballBody.velocity.z -= 45; 
                 
                 if (speedBoostTimer) clearTimeout(speedBoostTimer);
                 speedBoostTimer = setTimeout(() => {
                     speedBoostActive = false;
-                }, 4000); // Hız etkisi 4 saniye sürecek
+                }, 4000); 
             } 
             else if (powerId === 'bridge') {
                 const spawnZ = ballBody.position.z - 6;
@@ -533,6 +863,7 @@
 
         // --- TUŞ ATAMALARI ---
         function handleKeys(e, isPressed) {
+            if(!isPlaying) return; // Oynamıyorken tuşlar basmasın
             const key = e.key.toLowerCase();
             if (['w', 'arrowup'].includes(key)) keys.w = isPressed;
             if (['s', 'arrowdown'].includes(key)) keys.s = isPressed;
@@ -546,67 +877,67 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- BAŞLAT BUTONU ---
+        // --- OYUN AKIŞI ---
         function startGame() {
             startScreen.classList.remove('active');
-            document.body.classList.add('game-active'); // Arayüzleri ve topu şimdi göster!
-            isPlaying = true;
+            shopModal.classList.remove('active'); // Eğer açıksa kapat
+            document.body.classList.add('playing'); // Oyun modu sınıfını gövdeye ekle
+            isPlaying = true; // Fiziği ve kontrolleri aç!
         }
 
         function gameOver() {
             isPlaying = false;
-            document.body.classList.remove('game-active'); // Kaybedince gizle
+            document.body.classList.remove('playing'); 
             gameoverScreen.classList.add('active');
         }
 
         function winGame() {
             isPlaying = false;
-            document.body.classList.remove('game-active'); // Kazanınca gizle
+            document.body.classList.remove('playing'); 
+            
+            document.getElementById('win-p').innerText = `Bölüm ${userData.level} başarıyla tamamlandı! 100 Altın kazandın! 🎉`;
             winScreen.classList.add('active');
+            
+            userData.gold += 100; 
             saveGame();
         }
 
-        function restartGame() {
+        function loadNextLevel() {
+            userData.level++; 
+            saveGame();
+            
+            winScreen.classList.remove('active');
+            buildDynamicTrack(); 
+            restartGame(true); 
+        }
+
+        function restartGame(isNextLevel = false) {
             grantFreePowers();
 
+            // Topu başlangıç noktasına sıfırla
             ballBody.position.set(0, 5, 0);
             ballBody.velocity.set(0,0,0);
             ballBody.angularVelocity.set(0,0,0);
             speedBoostActive = false;
 
-            coins.forEach(c => {
-                if(!scene.children.includes(c)) scene.add(c);
-            });
-
-            obstacles[0].body.position.set(-2, 2, -30);
-            obstacles[1].body.position.set(2, 2, -60);
-            obstacles[2].body.position.set(0, 3.5, -110);
-            obstacles[3].body.position.set(-1, 2, -210);
-            obstacles.forEach(o => {
-                o.body.velocity.set(0,0,0);
-                o.body.angularVelocity.set(0,0,0);
-            });
-
-            temporaryBridges.forEach(b => {
-                scene.remove(b.mesh);
-                world.remove(b.body);
-            });
-            temporaryBridges = [];
+            if(!isNextLevel) {
+                buildDynamicTrack();
+            }
 
             gameoverScreen.classList.remove('active');
             winScreen.classList.remove('active');
-            document.body.classList.add('game-active');
+            document.body.classList.add('playing');
             isPlaying = true;
         }
 
-        // --- DÖNGÜ ---
+        // --- ANA DÖNGÜ ---
         function animate() {
             requestAnimationFrame(animate);
 
+            // FİZİK VE KONTROLLER SADECE OYUN BAŞLADIĞINDA ÇALIŞIR
             if (isPlaying) {
                 world.step(1 / 60);
 
-                // Klavye Güçleri (Klavye oyuncuları için standart sürüş)
                 const baseForce = 42;
                 const activeForce = speedBoostActive ? baseForce * 2.5 : baseForce;
                 
@@ -615,7 +946,6 @@
                 if (keys.a) ballBody.applyForce(new CANNON.Vec3(-activeForce, 0, 0), ballBody.position);
                 if (keys.d) ballBody.applyForce(new CANNON.Vec3(activeForce, 0, 0), ballBody.position);
 
-                // Hız Sınırları (Fırlatma mekaniğinde hız sınırlarını çok daha esnek yapıyoruz)
                 const maxVelocity = speedBoostActive ? 65 : 35;
                 let v = ballBody.velocity;
                 let speed = Math.sqrt(v.x*v.x + v.z*v.z);
@@ -624,14 +954,17 @@
                     ballBody.velocity.z = (v.z / speed) * maxVelocity;
                 }
 
-                ballMesh.position.copy(ballBody.position);
-                ballMesh.quaternion.copy(ballBody.quaternion);
+                // Köprülerin süresini kontrol et
+                for (let i = temporaryBridges.length - 1; i >= 0; i--) {
+                    let b = temporaryBridges[i];
+                    if (Date.now() > b.expiry) {
+                        scene.remove(b.mesh);
+                        world.remove(b.body);
+                        temporaryBridges.splice(i, 1);
+                    }
+                }
 
-                obstacles.forEach(o => {
-                    o.mesh.position.copy(o.body.position);
-                    o.mesh.quaternion.copy(o.body.quaternion);
-                });
-
+                // Altın Toplama
                 coins.forEach((coin) => {
                     coin.rotation.y += 0.04;
                     let dist = ballMesh.position.distanceTo(coin.position);
@@ -642,23 +975,31 @@
                     }
                 });
 
-                for (let i = temporaryBridges.length - 1; i >= 0; i--) {
-                    let b = temporaryBridges[i];
-                    if (Date.now() > b.expiry) {
-                        scene.remove(b.mesh);
-                        world.remove(b.body);
-                        temporaryBridges.splice(i, 1);
-                    }
-                }
-
-                camera.position.x += (ballMesh.position.x - camera.position.x) * 0.08;
-                camera.position.y += (ballMesh.position.y + 6 - camera.position.y) * 0.08;
-                camera.position.z += (ballMesh.position.z + 13 - camera.position.z) * 0.08;
-                camera.lookAt(ballMesh.position.x, ballMesh.position.y + 0.8, ballMesh.position.z - 2);
-
+                // Düştün mü kontrolü
                 if (ballBody.position.y < -15) gameOver();
-                if (ballBody.position.z < -255) winGame();
+                // Bitiş çizgisi kontrolü
+                if (ballBody.position.z < finishZ) winGame();
             }
+
+            // --- HER DURUMDA GÜNCELLENEN VE RENDER EDİLENLER (Giriş Ekranında da çalışır) ---
+            
+            // Topun fizik simülasyonundaki yerini 3D görsele kopyala
+            ballMesh.position.copy(ballBody.position);
+            ballMesh.quaternion.copy(ballBody.quaternion);
+
+            obstacles.forEach(o => {
+                o.mesh.position.copy(o.body.position);
+                o.mesh.quaternion.copy(o.body.quaternion);
+            });
+
+            // Altınları döndür (oyun başlamasa da dönsünler, güzel dursun)
+            coins.forEach(c => c.rotation.y += 0.015);
+
+            // Kamera Takibi
+            camera.position.x += (ballMesh.position.x - camera.position.x) * 0.08;
+            camera.position.y += (ballMesh.position.y + 6 - camera.position.y) * 0.08;
+            camera.position.z += (ballMesh.position.z + 13 - camera.position.z) * 0.08;
+            camera.lookAt(ballMesh.position.x, ballMesh.position.y + 0.8, ballMesh.position.z - 2);
 
             renderer.render(scene, camera);
         }
