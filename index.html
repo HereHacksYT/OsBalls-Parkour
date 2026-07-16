@@ -6,6 +6,19 @@
     <title>OsBalls Parkour</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Başlangıçta oyun arayüzlerini gizlemek için sınıflar */
+        #top-bar, #powers-hud, #instructions, #canvas-container {
+            display: none;
+        }
+        /* Oyun başladığında görünür yapmak için */
+        .game-active #top-bar, 
+        .game-active #powers-hud, 
+        .game-active #instructions, 
+        .game-active #canvas-container {
+            display: block !important;
+        }
+    </style>
 </head>
 <body>
 
@@ -21,7 +34,7 @@
     </div>
     
     <div id="instructions">
-        <b>Tablet/Telefon:</b> Parmağını sürükleyerek yön ver (İleri, Geri, Sağ, Sol).<br>
+        <b>Tablet/Telefon:</b> Topu fırlatmak için parmağını ekranda aşağıdan yukarıya doğru hızla kaydırıp bırak!<br>
         Özel güç butonlarına basarak uç!
     </div>
 
@@ -192,7 +205,9 @@
         let coins = [];
         let obstacles = [];
         let temporaryBridges = [];
-        let isPlaying = false; // "Oyna" butonuna basılana kadar oyun başlamaz
+        let isPlaying = false; 
+        let speedBoostActive = false; 
+        let speedBoostTimer = null;
 
         const textureLoader = new THREE.TextureLoader();
         const startScreen = document.getElementById('start-screen');
@@ -258,36 +273,42 @@
             window.addEventListener('keyup', (e) => handleKeys(e, false));
             window.addEventListener('resize', onWindowResize);
 
-            // Mobil Sürükleme (Joystick benzeri 360 Derece Sürükleme Kontrolü)
+            // MOBİL SWIPE (KAYDIRMA VE FIRLATMA) MEKANİĞİ
             let touchStartX = 0;
             let touchStartY = 0;
+            let touchStartTime = 0;
 
             window.addEventListener('touchstart', (e) => { 
+                if (e.target.closest('#powers-hud') || e.target.closest('#top-bar') || e.target.closest('#shop-modal')) return;
+                
                 touchStartX = e.touches[0].clientX; 
                 touchStartY = e.touches[0].clientY; 
+                touchStartTime = Date.now();
             });
 
-            window.addEventListener('touchmove', (e) => {
+            window.addEventListener('touchend', (e) => {
                 if(!isPlaying) return;
-                const touchX = e.touches[0].clientX;
-                const touchY = e.touches[0].clientY;
-                
-                const diffX = touchX - touchStartX;
-                const diffY = touchY - touchStartY;
+                if (e.target.closest('#powers-hud') || e.target.closest('#top-bar') || e.target.closest('#shop-modal')) return;
 
-                // X Ekseni (Sağ - Sol)
-                ballBody.velocity.x = diffX * 0.15;
-                // Y Ekseni (İleri - Geri) - Ekranda yukarı kaydırmak ileri (-z yönü) gitmesini sağlar
-                ballBody.velocity.z = diffY * 0.15;
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const touchDuration = Date.now() - touchStartTime;
 
-                touchStartX = touchX;
-                touchStartY = touchY;
-            });
+                // Sürükleme mesafeleri
+                const diffX = touchEndX - touchStartX;
+                const diffY = touchEndY - touchStartY;
 
-            window.addEventListener('touchend', () => {
-                if(isPlaying) {
-                    ballBody.velocity.x *= 0.5;
-                    ballBody.velocity.z *= 0.5;
+                // Sürükleme süresi çok uzun değilse (hızlı bir kaydırma yapıldıysa fırlat)
+                if (touchDuration < 600) {
+                    // Kuvvet çarpanı (Hız gücü aktifse fırlatma 2.5 kat daha güçlü olacak!)
+                    const swipeMultiplier = speedBoostActive ? 0.35 : 0.15;
+
+                    // Cannon.js gövdesine anlık itme kuvveti (impulse) uyguluyoruz
+                    const forceX = diffX * swipeMultiplier;
+                    const forceZ = diffY * swipeMultiplier; // Yukarı kaydırma negatif y'dir, yani -z (ileri) yönünde fırlar
+
+                    // Topa yönlü anlık kuvvet uygulayarak fırlatıyoruz!
+                    ballBody.applyImpulse(new CANNON.Vec3(forceX, 0, forceZ), ballBody.position);
                 }
             });
 
@@ -471,10 +492,18 @@
 
             if (powerId === 'jump') {
                 ballBody.velocity.y = 15;
-                ballBody.velocity.z -= 15;
+                // Zıplarken de hız gücü aktifse daha uzağa uçsun
+                ballBody.velocity.z -= speedBoostActive ? 28 : 15;
             } 
             else if (powerId === 'speed') {
-                ballBody.velocity.z -= 25;
+                // Hız gücü aktif olduğunda üst üste fırlatmalar ve limitler uçuşa geçiyor!
+                speedBoostActive = true;
+                ballBody.velocity.z -= 45; // Anlık çılgın bir fırlatma
+                
+                if (speedBoostTimer) clearTimeout(speedBoostTimer);
+                speedBoostTimer = setTimeout(() => {
+                    speedBoostActive = false;
+                }, 4000); // Hız etkisi 4 saniye sürecek
             } 
             else if (powerId === 'bridge') {
                 const spawnZ = ballBody.position.z - 6;
@@ -517,19 +546,22 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- BAŞLAT BUTONU TETİKLEYİCİSİ ---
+        // --- BAŞLAT BUTONU ---
         function startGame() {
             startScreen.classList.remove('active');
-            isPlaying = true; // Fizik ve hareketler şimdi aktif!
+            document.body.classList.add('game-active'); // Arayüzleri ve topu şimdi göster!
+            isPlaying = true;
         }
 
         function gameOver() {
             isPlaying = false;
+            document.body.classList.remove('game-active'); // Kaybedince gizle
             gameoverScreen.classList.add('active');
         }
 
         function winGame() {
             isPlaying = false;
+            document.body.classList.remove('game-active'); // Kazanınca gizle
             winScreen.classList.add('active');
             saveGame();
         }
@@ -540,6 +572,7 @@
             ballBody.position.set(0, 5, 0);
             ballBody.velocity.set(0,0,0);
             ballBody.angularVelocity.set(0,0,0);
+            speedBoostActive = false;
 
             coins.forEach(c => {
                 if(!scene.children.includes(c)) scene.add(c);
@@ -562,6 +595,7 @@
 
             gameoverScreen.classList.remove('active');
             winScreen.classList.remove('active');
+            document.body.classList.add('game-active');
             isPlaying = true;
         }
 
@@ -572,14 +606,17 @@
             if (isPlaying) {
                 world.step(1 / 60);
 
-                const force = 38;
-                // ARTIK W VE S TUŞLARI AKTİF: İLERİ VE GERİ GİTME FİZİĞİ
-                if (keys.w) ballBody.applyForce(new CANNON.Vec3(0, 0, -force), ballBody.position);
-                if (keys.s) ballBody.applyForce(new CANNON.Vec3(0, 0, force), ballBody.position);
-                if (keys.a) ballBody.applyForce(new CANNON.Vec3(-force, 0, 0), ballBody.position);
-                if (keys.d) ballBody.applyForce(new CANNON.Vec3(force, 0, 0), ballBody.position);
+                // Klavye Güçleri (Klavye oyuncuları için standart sürüş)
+                const baseForce = 42;
+                const activeForce = speedBoostActive ? baseForce * 2.5 : baseForce;
+                
+                if (keys.w) ballBody.applyForce(new CANNON.Vec3(0, 0, -activeForce), ballBody.position);
+                if (keys.s) ballBody.applyForce(new CANNON.Vec3(0, 0, activeForce), ballBody.position);
+                if (keys.a) ballBody.applyForce(new CANNON.Vec3(-activeForce, 0, 0), ballBody.position);
+                if (keys.d) ballBody.applyForce(new CANNON.Vec3(activeForce, 0, 0), ballBody.position);
 
-                const maxVelocity = 28;
+                // Hız Sınırları (Fırlatma mekaniğinde hız sınırlarını çok daha esnek yapıyoruz)
+                const maxVelocity = speedBoostActive ? 65 : 35;
                 let v = ballBody.velocity;
                 let speed = Math.sqrt(v.x*v.x + v.z*v.z);
                 if (speed > maxVelocity) {
