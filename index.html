@@ -118,7 +118,6 @@
             if (savedData) {
                 userData = JSON.parse(savedData);
             }
-            // Oyunu ilk kez açarken veya her yüklemede bedava hakları tanımla
             grantFreePowers();
         }
 
@@ -204,8 +203,8 @@
         function init() {
             scene = new THREE.Scene();
 
-            // ARKA PLAN GÖRSELİ (assets/skybox.jpg)
-            textureLoader.load('assets/skybox.jpg', function(texture) {
+            // GÜNCELLEME: Senin yüklediğin "sky.JPG" dosyası arka plan yapıldı
+            textureLoader.load('assets/sky.JPG', function(texture) {
                 scene.background = texture;
             }, undefined, function() {
                 scene.background = new THREE.Color(0x0a0f1d);
@@ -302,8 +301,8 @@
                 ballMesh.material.metalness = 0.2;
                 ballMesh.material.roughness = 0.8;
             } else {
-                // KLASİK TOP KAPLAMASI (assets/ball_texture.jpg)
-                textureLoader.load('assets/ball_texture.jpg', function(texture) {
+                // GÜNCELLEME: Senin yüklediğin "OsBall.png" dosyası klasik top kaplaması yapıldı
+                textureLoader.load('assets/OsBall.png', function(texture) {
                     ballMesh.material.map = texture;
                     ballMesh.material.color.setHex(0xffffff);
                     ballMesh.material.needsUpdate = true;
@@ -341,6 +340,7 @@
         // --- HARİTA VE YOL TASARIMI ---
         function buildTrack() {
             const roadMaterial = new THREE.MeshStandardMaterial({ roughness: 0.6 });
+            // GÜNCELLEME: Senin yüklediğin "wood_platform.jpg" kullanılıyor
             textureLoader.load('assets/wood_platform.jpg', function(texture) {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
@@ -404,7 +404,8 @@
         function createCoin(x, y, z) {
             const geometry = new THREE.CylinderGeometry(0.8, 0.8, 0.15, 16);
             const coinMat = new THREE.MeshStandardMaterial({ metalness: 0.9, roughness: 0.1 });
-            textureLoader.load('assets/coin.png', function(texture) {
+            // GÜNCELLEME: Senin yüklediğin "Coin.png" dosyası coin kaplaması yapıldı
+            textureLoader.load('assets/Coin.png', function(texture) {
                 coinMat.map = texture;
                 coinMat.needsUpdate = true;
             }, undefined, function() {
@@ -500,6 +501,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        // Oyunu Başlat
         function startGame() {
             startScreen.classList.remove('active');
             isPlaying = true;
@@ -517,7 +519,6 @@
         }
 
         function restartGame() {
-            // TUR SIFIRLANDIĞINDA BEDAVA GÜÇLERİ DAĞIT
             grantFreePowers();
 
             ballBody.position.set(0, 5, 0);
