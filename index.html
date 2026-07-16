@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>OsBalls Parkour</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="top-bar">
+        <div class="ui-panel" id="gold-panel">🪙 ALTIN: <span id="gold-count">0</span></div>
+        <div class="ui-panel" id="shop-trigger-btn" style="cursor: pointer;">🛒 MARKET</div>
+    </div>
+
+    <div id="powers-hud">
+        <button class="power-btn" id="pbtn-jump">🚀 1. Zıplama <span>[Sayı: <b id="p1-qty">0</b>]</span></button>
+        <button class="power-btn" id="pbtn-speed">⚡ 2. 2x Hız <span>[Sayı: <b id="p2-qty">0</b>]</span></button>
+        <button class="power-btn" id="pbtn-bridge">🌉 3. Yol Koy <span>[Sayı: <b id="p3-qty">0</b>]</span></button>
+    </div>
+    
+    <div id="instructions">
+        <b>Tablet/Telefon:</b> Sürükleyerek yön ver.<br>
+        Özel güç butonlarına basarak uç!
+    </div>
+
+    <div id="start-screen" class="screen active">
+        <h1>OsBalls Parkour</h1>
+        <p>Her Turda Ücretsiz Özel Güçler ve Özelleştirilebilir Toplar ile Macera Başlıyor!</p>
+        <div class="menu-buttons">
+            <button class="btn" id="start-btn">Oyna</button>
+        </div>
+    </div>
+
+    <div id="gameover-screen" class="screen">
+        <h1 style="background: linear-gradient(45deg, #ff3d00, #ff9100); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Düştün!</h1>
+        <p style="color: #ff9800; font-weight: bold; margin-bottom: 15px;">Üzülme, yeni turda tüm özel güçlerin 1 adet olarak yenilendi! 🎁</p>
+        <button class="btn secondary" id="restart-btn">Tekrar Dene</button>
+    </div>
+
+    <div id="win-screen" class="screen">
+        <h1 style="background: linear-gradient(45deg, #00ff87, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Parkur Tamamlandı!</h1>
+        <p>Bitiş çizgisine başarıyla ulaştın!</p>
+        <button class="btn" id="next-btn">Tekrar Oyna</button>
+    </div>
+
+    <div id="shop-modal">
+        <h2 style="color: #00ffcc; margin-top:0; font-size: 22px;">OsBalls Market</h2>
+        <p style="color: #ffd700; font-weight: bold; margin: 5px 0 15px 0;">Mevcut Altın: <span id="shop-gold">0</span> 🪙</p>
+        
+        <div class="shop-section">
+            <h3>Top Görünümleri</h3>
+            <div class="shop-items">
+                <div class="shop-card equipped" id="skin-default">
+                    <h4>Klasik Desen</h4>
+                    <span class="price">ÜCRETSİZ</span>
+                </div>
+                <div class="shop-card" id="skin-neon">
+                    <h4>Neon Mavi</h4>
+                    <span class="price">50 Altın</span>
+                </div>
+                <div class="shop-card" id="skin-lava">
+                    <h4>Volkanik Kor</h4>
+                    <span class="price">120 Altın</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="shop-section">
+            <h3>Özel Güçler (100 Altın)</h3>
+            <div class="shop-items">
+                <div class="shop-card" id="buy-p1">
+                    <h4>Zıplama</h4>
+                    <span class="price">100 Altın</span>
+                </div>
+                <div class="shop-card" id="buy-p2">
+                    <h4>2x Hız</h4>
+                    <span class="price">100 Altın</span>
+                </div>
+                <div class="shop-card" id="buy-p3">
+                    <h4>Yol Koyma</h4>
+                    <span class="price">100 Altın</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="close-shop" id="close-shop-btn">KAPAT</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cannon@0.6.2/build/cannon.min.js"></script>
+
+    <script>
+        // --- DATA / SAVE SYSTEM (localStorage) ---
+        let userData = {
+            gold: 0,
+            ownedSkins: ['default'],
+            equippedSkin: 'default',
+            powers: { jump: 1, speed: 1, bridge: 1 }
+        };
+
+        // Her tur başında güçleri en az 1 yapacak fonksiyon
+        function grantFreePowers() {
+            if (!userData.powers) {
+                userData.powers = { jump: 1, speed: 1, bridge: 1 };
+            }
+            if (userData.powers.jump < 1) userData.powers.jump = 1;
+            if (userData.powers.speed < 1) userData.powers.speed = 1;
+            if (userData.powers.bridge < 1) userData.powers.bridge = 1;
+            saveGame();
+        }
+
+        function loadGame() {
+            const savedData = localStorage.getItem('osball_save');
+            if (savedData) {
+                userData = JSON.parse(savedData);
+            }
+            // Oyunu ilk kez açarken veya her yüklemede bedava hakları tanımla
+            grantFreePowers();
+        }
+
+        function saveGame() {
+            localStorage.setItem('osball_save', JSON.stringify(userData));
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('gold-count').innerText = userData.gold;
+            document.getElementById('shop-gold').innerText = userData.gold;
+            document.getElementById('p1-qty').innerText = userData.powers.jump;
+            document.getElementById('p2-qty').innerText = userData.powers.speed;
+            document.getElementById('p3-qty').innerText = userData.powers.bridge;
+
+            document.querySelectorAll('.shop-card').forEach(card => card.classList.remove('equipped'));
+            const currentSkinCard = document.getElementById(`skin-${userData.equippedSkin}`);
+            if(currentSkinCard) currentSkinCard.classList.add('equipped');
+        }
+
+        // --- MARKET ---
+        const shopModal = document.getElementById('shop-modal');
+        document.getElementById('shop-trigger-btn').addEventListener('click', () => {
+            shopModal.classList.add('active');
+            isPlaying = false;
+        });
+        document.getElementById('close-shop-btn').addEventListener('click', () => {
+            shopModal.classList.remove('active');
+            if(!startScreen.classList.contains('active') && !gameoverScreen.classList.contains('active') && !winScreen.classList.contains('active')) {
+                isPlaying = true;
+            }
+        });
+
+        function buySkin(skinId, price) {
+            if (userData.ownedSkins.includes(skinId)) {
+                userData.equippedSkin = skinId;
+                applyBallSkin(skinId);
+                saveGame();
+                return;
+            }
+            if (userData.gold >= price) {
+                userData.gold -= price;
+                userData.ownedSkins.push(skinId);
+                userData.equippedSkin = skinId;
+                applyBallSkin(skinId);
+                saveGame();
+            } else {
+                alert("Yetersiz altın!");
+            }
+        }
+
+        function buyPower(powerId) {
+            if (userData.gold >= 100) {
+                userData.gold -= 100;
+                userData.powers[powerId] = (userData.powers[powerId] || 0) + 1;
+                saveGame();
+            } else {
+                alert("Yetersiz altın! Özel güçler 100 altındır.");
+            }
+        }
+
+        document.getElementById('skin-default').addEventListener('click', () => buySkin('default', 0));
+        document.getElementById('skin-neon').addEventListener('click', () => buySkin('neon', 50));
+        document.getElementById('skin-lava').addEventListener('click', () => buySkin('lava', 120));
+        document.getElementById('buy-p1').addEventListener('click', () => buyPower('jump'));
+        document.getElementById('buy-p2').addEventListener('click', () => buyPower('speed'));
+        document.getElementById('buy-p3').addEventListener('click', () => buyPower('bridge'));
+
+        // --- 3D OYUN ALANI ---
+        let scene, camera, renderer, world;
+        let ballBody, ballMesh;
+        let keys = { w: false, a: false, s: false, d: false };
+        let coins = [];
+        let obstacles = [];
+        let temporaryBridges = [];
+        let isPlaying = false;
+
+        const textureLoader = new THREE.TextureLoader();
+        const startScreen = document.getElementById('start-screen');
+        const gameoverScreen = document.getElementById('gameover-screen');
+        const winScreen = document.getElementById('win-screen');
+
+        function init() {
+            scene = new THREE.Scene();
+
+            // ARKA PLAN GÖRSELİ (assets/skybox.jpg)
+            textureLoader.load('assets/skybox.jpg', function(texture) {
+                scene.background = texture;
+            }, undefined, function() {
+                scene.background = new THREE.Color(0x0a0f1d);
+            });
+
+            scene.fog = new THREE.FogExp2(0x050711, 0.012);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+            dirLight.position.set(30, 60, 30);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            // Fizik
+            world = new CANNON.World();
+            world.gravity.set(0, -22, 0);
+
+            const wallMaterial = new CANNON.Material("wallMaterial");
+            const ballMaterial = new CANNON.Material("ballMaterial");
+            const contactMaterial = new CANNON.ContactMaterial(ballMaterial, wallMaterial, {
+                friction: 0.7,
+                restitution: 0.25
+            });
+            world.addContactMaterial(contactMaterial);
+
+            buildTrack();
+            createPlayerBall(ballMaterial);
+
+            loadGame();
+            applyBallSkin(userData.equippedSkin);
+
+            // Kontroller
+            window.addEventListener('keydown', (e) => {
+                handleKeys(e, true);
+                if (e.key === '1') usePower('jump');
+                if (e.key === '2') usePower('speed');
+                if (e.key === '3') usePower('bridge');
+            });
+            window.addEventListener('keyup', (e) => handleKeys(e, false));
+            window.addEventListener('resize', onWindowResize);
+
+            // Mobil Sürükleme
+            let touchStartX = 0;
+            window.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+            window.addEventListener('touchmove', (e) => {
+                if(!isPlaying) return;
+                const touchX = e.touches[0].clientX;
+                const diffX = touchX - touchStartX;
+                ballBody.velocity.x = diffX * 0.18;
+                touchStartX = touchX;
+            });
+            window.addEventListener('touchend', () => {
+                if(isPlaying) ballBody.velocity.x *= 0.5;
+            });
+
+            document.getElementById('pbtn-jump').addEventListener('click', () => usePower('jump'));
+            document.getElementById('pbtn-speed').addEventListener('click', () => usePower('speed'));
+            document.getElementById('pbtn-bridge').addEventListener('click', () => usePower('bridge'));
+
+            document.getElementById('start-btn').addEventListener('click', startGame);
+            document.getElementById('restart-btn').addEventListener('click', restartGame);
+            document.getElementById('next-btn').addEventListener('click', restartGame);
+
+            animate();
+        }
+
+        // --- KAPLAMALAR VE SKİNLER ---
+        function applyBallSkin(skinId) {
+            if (!ballMesh) return;
+
+            if (skinId === 'neon') {
+                ballMesh.material.map = null;
+                ballMesh.material.color.setHex(0x00ffcc);
+                ballMesh.material.emissive.setHex(0x003322);
+                ballMesh.material.metalness = 0.9;
+                ballMesh.material.roughness = 0.1;
+            } else if (skinId === 'lava') {
+                ballMesh.material.map = null;
+                ballMesh.material.color.setHex(0xff3d00);
+                ballMesh.material.emissive.setHex(0x441100);
+                ballMesh.material.metalness = 0.2;
+                ballMesh.material.roughness = 0.8;
+            } else {
+                // KLASİK TOP KAPLAMASI (assets/ball_texture.jpg)
+                textureLoader.load('assets/ball_texture.jpg', function(texture) {
+                    ballMesh.material.map = texture;
+                    ballMesh.material.color.setHex(0xffffff);
+                    ballMesh.material.needsUpdate = true;
+                }, undefined, function() {
+                    ballMesh.material.color.setHex(0xff7700);
+                });
+                ballMesh.material.emissive.setHex(0x000000);
+                ballMesh.material.metalness = 0.4;
+                ballMesh.material.roughness = 0.3;
+            }
+            ballMesh.material.needsUpdate = true;
+        }
+
+        function createPlayerBall(material) {
+            const radius = 1.2;
+            const sphereShape = new CANNON.Sphere(radius);
+            ballBody = new CANNON.Body({
+                mass: 5,
+                shape: sphereShape,
+                material: material
+            });
+            ballBody.position.set(0, 5, 0);
+            ballBody.linearDamping = 0.15;
+            ballBody.angularDamping = 0.15;
+            world.addBody(ballBody);
+
+            const geometry = new THREE.SphereGeometry(radius, 32, 32);
+            const ballMaterial3D = new THREE.MeshStandardMaterial({ roughness: 0.3 });
+
+            ballMesh = new THREE.Mesh(geometry, ballMaterial3D);
+            ballMesh.castShadow = true;
+            scene.add(ballMesh);
+        }
+
+        // --- HARİTA VE YOL TASARIMI ---
+        function buildTrack() {
+            const roadMaterial = new THREE.MeshStandardMaterial({ roughness: 0.6 });
+            textureLoader.load('assets/wood_platform.jpg', function(texture) {
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(2, 10);
+                roadMaterial.map = texture;
+                roadMaterial.needsUpdate = true;
+            }, undefined, function() {
+                roadMaterial.color.setHex(0x3e2723);
+            });
+
+            createPlatform(8, 1, 100, 0, 0, -40, roadMaterial);
+            createPlatform(8, 1, 60, 0, 2, -120, roadMaterial);
+            createPlatform(8, 1, 80, 0, -2, -220, roadMaterial); 
+
+            // Engeller
+            createObstacle(3, 3, 3, -2, 2, -30);
+            createObstacle(3, 3, 3, 2, 2, -60);
+            createObstacle(4, 2, 4, 0, 3.5, -110);
+            createObstacle(3, 3, 3, -1, 2, -210);
+
+            // Altınlar
+            createCoin(0, 2, -20);
+            createCoin(-2, 2, -50);
+            createCoin(2, 4.5, -110);
+            createCoin(0, 2, -150);
+            createCoin(0, 1, -230);
+
+            // Bitiş Hattı
+            createFinishLine(8, 1, 5, 0, -1.4, -255);
+        }
+
+        function createPlatform(w, h, d, x, y, z, material) {
+            const shape = new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2));
+            const body = new CANNON.Body({ mass: 0, shape: shape });
+            body.position.set(x, y, z);
+            world.addBody(body);
+
+            const geometry = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z);
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+        }
+
+        function createObstacle(w, h, d, x, y, z) {
+            const shape = new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2));
+            const body = new CANNON.Body({ mass: 8, shape: shape });
+            body.position.set(x, y, z);
+            world.addBody(body);
+
+            const geometry = new THREE.BoxGeometry(w, h, d);
+            const material = new THREE.MeshStandardMaterial({ color: 0xff1744, roughness: 0.1 });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            obstacles.push({ body, mesh });
+        }
+
+        function createCoin(x, y, z) {
+            const geometry = new THREE.CylinderGeometry(0.8, 0.8, 0.15, 16);
+            const coinMat = new THREE.MeshStandardMaterial({ metalness: 0.9, roughness: 0.1 });
+            textureLoader.load('assets/coin.png', function(texture) {
+                coinMat.map = texture;
+                coinMat.needsUpdate = true;
+            }, undefined, function() {
+                coinMat.color.setHex(0xffd700);
+            });
+
+            const mesh = new THREE.Mesh(geometry, coinMat);
+            mesh.rotation.x = Math.PI / 2;
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            coins.push(mesh);
+        }
+
+        function createFinishLine(w, h, d, x, y, z) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,64,64);
+            ctx.fillStyle = '#000000';
+            for(let i=0; i<2; i++){
+                for(let j=0; j<2; j++){
+                    if((i+j)%2===0) ctx.fillRect(i*32, j*32, 32, 32);
+                }
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(4, 1);
+
+            const geometry = new THREE.BoxGeometry(w, h + 0.1, d);
+            const material = new THREE.MeshStandardMaterial({ map: texture });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+        }
+
+        // --- ÖZEL GÜÇ KULLANIMI ---
+        function usePower(powerId) {
+            if (!isPlaying) return;
+            if ((userData.powers[powerId] || 0) <= 0) {
+                alert("Yetersiz güç sayısı! Marketten satın almalısın.");
+                return;
+            }
+
+            userData.powers[powerId]--;
+            saveGame();
+
+            if (powerId === 'jump') {
+                ballBody.velocity.y = 15;
+                ballBody.velocity.z -= 15;
+            } 
+            else if (powerId === 'speed') {
+                ballBody.velocity.z -= 25;
+            } 
+            else if (powerId === 'bridge') {
+                const spawnZ = ballBody.position.z - 6;
+                const spawnY = ballBody.position.y - 1.2;
+                const spawnX = ballBody.position.x;
+
+                const bridgeGeo = new THREE.BoxGeometry(6, 0.4, 10);
+                const bridgeMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x00ffcc, 
+                    transparent: true, 
+                    opacity: 0.7,
+                    emissive: 0x003322
+                });
+                const mesh = new THREE.Mesh(bridgeGeo, bridgeMat);
+                mesh.position.set(spawnX, spawnY, spawnZ);
+                scene.add(mesh);
+
+                const shape = new CANNON.Box(new CANNON.Vec3(3, 0.2, 5));
+                const body = new CANNON.Body({ mass: 0, shape: shape });
+                body.position.set(spawnX, spawnY, spawnZ);
+                world.addBody(body);
+
+                const bridgeObj = { body, mesh, expiry: Date.now() + 4000 };
+                temporaryBridges.push(bridgeObj);
+            }
+        }
+
+        // --- SİSTEM ---
+        function handleKeys(e, isPressed) {
+            const key = e.key.toLowerCase();
+            if (['w', 'arrowup'].includes(key)) keys.w = isPressed;
+            if (['s', 'arrowdown'].includes(key)) keys.s = isPressed;
+            if (['a', 'arrowleft'].includes(key)) keys.a = isPressed;
+            if (['d', 'arrowright'].includes(key)) keys.d = isPressed;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function startGame() {
+            startScreen.classList.remove('active');
+            isPlaying = true;
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            gameoverScreen.classList.add('active');
+        }
+
+        function winGame() {
+            isPlaying = false;
+            winScreen.classList.add('active');
+            saveGame();
+        }
+
+        function restartGame() {
+            // TUR SIFIRLANDIĞINDA BEDAVA GÜÇLERİ DAĞIT
+            grantFreePowers();
+
+            ballBody.position.set(0, 5, 0);
+            ballBody.velocity.set(0,0,0);
+            ballBody.angularVelocity.set(0,0,0);
+
+            coins.forEach(c => {
+                if(!scene.children.includes(c)) scene.add(c);
+            });
+
+            obstacles[0].body.position.set(-2, 2, -30);
+            obstacles[1].body.position.set(2, 2, -60);
+            obstacles[2].body.position.set(0, 3.5, -110);
+            obstacles[3].body.position.set(-1, 2, -210);
+            obstacles.forEach(o => {
+                o.body.velocity.set(0,0,0);
+                o.body.angularVelocity.set(0,0,0);
+            });
+
+            temporaryBridges.forEach(b => {
+                scene.remove(b.mesh);
+                world.remove(b.body);
+            });
+            temporaryBridges = [];
+
+            gameoverScreen.classList.remove('active');
+            winScreen.classList.remove('active');
+            isPlaying = true;
+        }
+
+        // --- DÖNGÜ ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (isPlaying) {
+                world.step(1 / 60);
+
+                const force = 38;
+                if (keys.w) ballBody.applyForce(new CANNON.Vec3(0, 0, -force), ballBody.position);
+                if (keys.s) ballBody.applyForce(new CANNON.Vec3(0, 0, force), ballBody.position);
+                if (keys.a) ballBody.applyForce(new CANNON.Vec3(-force, 0, 0), ballBody.position);
+                if (keys.d) ballBody.applyForce(new CANNON.Vec3(force, 0, 0), ballBody.position);
+
+                const maxVelocity = 28;
+                let v = ballBody.velocity;
+                let speed = Math.sqrt(v.x*v.x + v.z*v.z);
+                if (speed > maxVelocity) {
+                    ballBody.velocity.x = (v.x / speed) * maxVelocity;
+                    ballBody.velocity.z = (v.z / speed) * maxVelocity;
+                }
+
+                ballMesh.position.copy(ballBody.position);
+                ballMesh.quaternion.copy(ballBody.quaternion);
+
+                obstacles.forEach(o => {
+                    o.mesh.position.copy(o.body.position);
+                    o.mesh.quaternion.copy(o.body.quaternion);
+                });
+
+                coins.forEach((coin) => {
+                    coin.rotation.y += 0.04;
+                    let dist = ballMesh.position.distanceTo(coin.position);
+                    if (dist < 1.8 && scene.children.includes(coin)) {
+                        scene.remove(coin);
+                        userData.gold += 10;
+                        saveGame();
+                    }
+                });
+
+                for (let i = temporaryBridges.length - 1; i >= 0; i--) {
+                    let b = temporaryBridges[i];
+                    if (Date.now() > b.expiry) {
+                        scene.remove(b.mesh);
+                        world.remove(b.body);
+                        temporaryBridges.splice(i, 1);
+                    }
+                }
+
+                camera.position.x += (ballMesh.position.x - camera.position.x) * 0.08;
+                camera.position.y += (ballMesh.position.y + 6 - camera.position.y) * 0.08;
+                camera.position.z += (ballMesh.position.z + 13 - camera.position.z) * 0.08;
+                camera.lookAt(ballMesh.position.x, ballMesh.position.y + 0.8, ballMesh.position.z - 2);
+
+                if (ballBody.position.y < -15) gameOver();
+                if (ballBody.position.z < -255) winGame();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
